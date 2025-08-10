@@ -67,10 +67,38 @@ st.markdown("""
         background: linear-gradient(180deg, #f8f9fa, #e9ecef);
     }
     
-    /* Table styling enhancements */
+    /* Table styling enhancements - frozen first column */
     .dataframe {
         border: 1px solid #dee2e6;
         border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    /* Enhanced frozen column styling */
+    div[data-testid="stDataFrame"] table {
+        position: relative;
+    }
+    
+    div[data-testid="stDataFrame"] table thead th:first-child,
+    div[data-testid="stDataFrame"] table tbody td:first-child {
+        position: sticky !important;
+        left: 0 !important;
+        z-index: 10 !important;
+        background: #ffffff !important;
+        border-right: 3px solid #2e7d32 !important;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.1) !important;
+    }
+    
+    div[data-testid="stDataFrame"] table thead th:first-child {
+        background: #2e7d32 !important;
+        color: white !important;
+        font-weight: bold !important;
+    }
+    
+    div[data-testid="stDataFrame"] table tbody td:first-child {
+        background: #f8f9fa !important;
+        font-weight: 600 !important;
+        color: #1b5e20 !important;
     }
     
     /* Custom button styling */
@@ -237,119 +265,117 @@ try:
             # Compact success message
             st.success(f"✅ Fetched data for {len(df)} stocks on {selected_date.strftime('%d-%b-%Y')}")
 
-            # Data transformation
+            # Data transformation - Updated column order as per requirements
             display_df = pd.DataFrame()
-            display_df['Date'] = pd.to_datetime(df['DATE1'], format='%d-%b-%Y').dt.strftime('%d-%m-%Y')
-            display_df['Symbol'] = df['SYMBOL']
             
             # Get company names mapping
             symbol_to_name = get_symbol_to_name_map()
-            display_df['Company Name'] = (
-                display_df['Symbol'].astype(str).str.upper().map(symbol_to_name)
-                .fillna(display_df['Symbol'])
+            display_df['Stock Name'] = (
+                df['SYMBOL'].astype(str).str.upper().map(symbol_to_name)
+                .fillna(df['SYMBOL'])
             )
             
-            display_df['Prev Close'] = df['PREV_CLOSE'].round(2)
-            display_df["Close Price"] = df['CLOSE_PRICE'].round(2)
-            display_df['% Change'] = (
+            display_df['% Price Change'] = (
                 (df['CLOSE_PRICE'] - df['PREV_CLOSE']) / df['PREV_CLOSE'] * 100
             ).round(2)
-            display_df['Volume'] = df['TTL_TRD_QNTY'].astype(int)
-            display_df['Delivered Qty'] = pd.to_numeric(df['DELIV_QTY'], errors='coerce').fillna(0).astype(int)
             display_df['% Delivery'] = pd.to_numeric(df['DELIV_PER'], errors='coerce').fillna(0).round(2)
+            display_df['Total Volume Traded'] = df['TTL_TRD_QNTY'].astype(int)
+            display_df["Close Price"] = df['CLOSE_PRICE'].round(2)
+            display_df['Previous Close Price'] = df['PREV_CLOSE'].round(2)
+            
+            # Keep symbol for filtering purposes (not displayed in main table)
+            display_df['Symbol'] = df['SYMBOL']
+            display_df['Date'] = pd.to_datetime(df['DATE1'], format='%d-%b-%Y').dt.strftime('%d-%m-%Y')
+            display_df['Delivered Qty'] = pd.to_numeric(df['DELIV_QTY'], errors='coerce').fillna(0).astype(int)
             display_df['Turnover (₹ Cr)'] = (df['TURNOVER_LACS'] / 100).round(2)
             display_df = display_df.fillna(0)
 
-            # Compact filters section
+            # Enhanced filters section as per requirements
             st.markdown("### 🔍 Filters")
             
             with st.expander("🎛️ Filter Options", expanded=True):
                 f1, f2, f3, f4 = st.columns(4)
                 
                 with f1:
-                    st.markdown("**📈 Price Change**")
-                    min_chg = st.slider(
-                        "Min %",
-                        min_value=float(display_df['% Change'].min()),
-                        max_value=float(display_df['% Change'].max()),
-                        value=float(display_df['% Change'].min()),
-                        step=0.1,
+                    st.markdown("**📈 % Change**")
+                    min_chg = st.number_input(
+                        "Min % Change",
+                        min_value=float(display_df['% Price Change'].min()),
+                        max_value=float(display_df['% Price Change'].max()),
+                        value=float(display_df['% Price Change'].min()),
+                        step=0.5,
+                        format="%.1f",
+                        help="Filter stocks by minimum price change percentage"
                     )
-                    max_chg = st.slider(
-                        "Max %",
-                        min_value=float(display_df['% Change'].min()),
-                        max_value=float(display_df['% Change'].max()),
-                        value=float(display_df['% Change'].max()),
-                        step=0.1,
+                    max_chg = st.number_input(
+                        "Max % Change",
+                        min_value=float(display_df['% Price Change'].min()),
+                        max_value=float(display_df['% Price Change'].max()),
+                        value=float(display_df['% Price Change'].max()),
+                        step=0.5,
+                        format="%.1f",
+                        help="Filter stocks by maximum price change percentage"
                     )
                 
                 with f2:
-                    st.markdown("**📦 Delivery %**")
-                    min_del = st.slider(
-                        "Min Delivery",
+                    st.markdown("**📦 % Delivery**")
+                    min_del = st.number_input(
+                        "Min % Delivery",
                         min_value=0.0,
                         max_value=100.0,
                         value=0.0,
-                        step=1.0,
+                        step=5.0,
+                        format="%.0f",
+                        help="Filter stocks by minimum delivery percentage"
                     )
-                    max_del = st.slider(
-                        "Max Delivery",
+                    max_del = st.number_input(
+                        "Max % Delivery",
                         min_value=0.0,
                         max_value=100.0,
                         value=100.0,
-                        step=1.0,
+                        step=5.0,
+                        format="%.0f",
+                        help="Filter stocks by maximum delivery percentage"
                     )
                 
                 with f3:
-                    st.markdown("**📊 Volume**")
-                    volume_threshold = st.number_input(
-                        "Min Volume",
-                        min_value=0,
-                        value=0,
-                        step=1000,
-                        format="%d"
-                    )
-                    turnover_threshold = st.number_input(
-                        "Min Turnover (Cr)",
-                        min_value=0.0,
-                        value=0.0,
-                        step=0.1,
-                        format="%.1f"
+                    st.markdown("**🎯 Indices**")
+                    index_choice = st.selectbox(
+                        "Select Index",
+                        options=["All Stocks", "NIFTY50", "NIFTY100", "NIFTY200", "NIFTY500"],
+                        index=0,
+                        help="Filter stocks by index membership"
                     )
                 
                 with f4:
-                    st.markdown("**🎯 Filters**")
-                    index_choice = st.selectbox(
-                        "Index",
-                        options=["All Stocks", "NIFTY50", "NIFTY100", "NIFTY200", "NIFTY500"],
-                        index=0,
-                    )
-                    symbol_filter = st.text_input(
-                        "Symbol",
-                        placeholder="e.g., RELIANCE",
-                        help="Filter by symbol name"
+                    st.markdown("**🔍 Stock Search**")
+                    stock_search = st.text_input(
+                        "Search Stock",
+                        placeholder="e.g., RELIANCE, TCS, HDFC",
+                        help="Search by stock symbol or company name"
                     )
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Apply filters
+            # Apply filters as per requirements
             filtered_df = display_df[
-                (display_df['% Change'] >= min_chg) &
-                (display_df['% Change'] <= max_chg) &
+                (display_df['% Price Change'] >= min_chg) &
+                (display_df['% Price Change'] <= max_chg) &
                 (display_df['% Delivery'] >= min_del) &
-                (display_df['% Delivery'] <= max_del) &
-                (display_df['Volume'] >= volume_threshold) &
-                (display_df['Turnover (₹ Cr)'] >= turnover_threshold)
+                (display_df['% Delivery'] <= max_del)
             ].copy()
             
-            if symbol_filter:
-                filtered_df = filtered_df[
-                    filtered_df['Symbol'].str.contains(symbol_filter.upper(), na=False)
-                ]
+            # Stock search filter - search both symbol and company name
+            if stock_search:
+                search_mask = (
+                    filtered_df['Symbol'].str.contains(stock_search.upper(), na=False) |
+                    filtered_df['Stock Name'].str.contains(stock_search.upper(), case=False, na=False)
+                )
+                filtered_df = filtered_df[search_mask]
             
+            # Index filter
             if index_choice and index_choice != "All Stocks":
-                index_name = index_choice.replace("All Stocks", "")
-                members = get_index_members(index_name)
+                members = get_index_members(index_choice)
                 if members:
                     filtered_df = filtered_df[
                         filtered_df['Symbol'].str.upper().isin(members)
@@ -363,19 +389,19 @@ try:
             with m1:
                 st.metric("📈 Stocks", f"{len(filtered_df):,}")
             with m2:
-                avg_change = filtered_df['% Change'].mean()
+                avg_change = filtered_df['% Price Change'].mean()
                 st.metric("📊 Avg Change", f"{avg_change:.1f}%")
             with m3:
                 avg_delivery = filtered_df['% Delivery'].mean()
                 st.metric("📦 Avg Delivery", f"{avg_delivery:.1f}%")
             with m4:
-                total_volume = filtered_df['Volume'].sum()
+                total_volume = filtered_df['Total Volume Traded'].sum()
                 st.metric("📊 Volume", f"{total_volume/1e7:.1f}Cr")
             with m5:
                 total_turnover = filtered_df['Turnover (₹ Cr)'].sum()
                 st.metric("💰 Turnover", f"₹{total_turnover:,.0f}Cr")
 
-            # Enhanced data table
+            # Enhanced data table with custom column order
             st.markdown("### 📋 Stock Data Table")
             
             # Pagination and sorting controls
@@ -390,7 +416,7 @@ try:
             with pc2:
                 sort_by = st.selectbox(
                     "🔤 Sort by", 
-                    ['% Change', 'Volume', '% Delivery', 'Turnover (₹ Cr)', 'Symbol'],
+                    ['% Price Change', 'Total Volume Traded', '% Delivery', 'Close Price', 'Stock Name'],
                     help="Choose column to sort by"
                 )
             with pc3:
@@ -423,59 +449,43 @@ try:
                 page_df = filtered_df
                 st.info(f"📄 Showing all **{total_rows:,}** filtered results")
 
-            # Enhanced dataframe display
+            # Display dataframe with custom column order - Stock Name will be frozen
+            display_columns = ['Stock Name', '% Price Change', '% Delivery', 'Total Volume Traded', 'Close Price', 'Previous Close Price']
+            page_display_df = page_df[display_columns]
+
+            # Enhanced dataframe display with frozen first column
             st.dataframe(
-                page_df,
+                page_display_df,
                 use_container_width=True,
                 column_config={
-                    "Date": st.column_config.TextColumn(
-                        "📅 Date",
-                        help="Trading date",
-                        width="small"
-                    ),
-                    "Symbol": st.column_config.TextColumn(
-                        "🏷️ Symbol",
-                        help="Stock symbol",
-                        width="medium"
-                    ),
-                    "Company Name": st.column_config.TextColumn(
-                        "🏢 Company Name",
-                        help="Full company name",
+                    "Stock Name": st.column_config.TextColumn(
+                        "🏢 Stock Name",
+                        help="Company name (frozen column)",
                         width="large"
                     ),
-                    "Prev Close": st.column_config.NumberColumn(
-                        "📊 Prev Close",
-                        help="Previous day's closing price",
-                        format="₹%.2f"
-                    ),
-                    "Close Price": st.column_config.NumberColumn(
-                        "💰 Close Price",
-                        help="Today's closing price",
-                        format="₹%.2f"
-                    ),
-                    "% Change": st.column_config.NumberColumn(
-                        "📈 % Change",
-                        help="Percentage price change",
+                    "% Price Change": st.column_config.NumberColumn(
+                        "📈 % Price Change",
+                        help="Percentage price change from previous close",
                         format="%.2f%%"
-                    ),
-                    "Volume": st.column_config.NumberColumn(
-                        "📊 Volume",
-                        help="Total traded volume",
-                        format="%,d"
-                    ),
-                    "Delivered Qty": st.column_config.NumberColumn(
-                        "📦 Delivered Qty",
-                        help="Delivered quantity",
-                        format="%,d"
                     ),
                     "% Delivery": st.column_config.NumberColumn(
                         "📦 % Delivery",
                         help="Delivery percentage",
                         format="%.2f%%"
                     ),
-                    "Turnover (₹ Cr)": st.column_config.NumberColumn(
-                        "💰 Turnover (₹ Cr)",
-                        help="Total turnover in crores",
+                    "Total Volume Traded": st.column_config.NumberColumn(
+                        "📊 Total Volume Traded",
+                        help="Total traded volume",
+                        format="%,d"
+                    ),
+                    "Close Price": st.column_config.NumberColumn(
+                        "💰 Close Price",
+                        help="Today's closing price",
+                        format="₹%.2f"
+                    ),
+                    "Previous Close Price": st.column_config.NumberColumn(
+                        "📊 Previous Close Price",
+                        help="Previous day's closing price",
                         format="₹%.2f"
                     ),
                 },
@@ -487,7 +497,7 @@ try:
             dl1, dl2, dl3 = st.columns(3)
             
             with dl1:
-                csv_data = filtered_df.to_csv(index=False)
+                csv_data = filtered_df[display_columns].to_csv(index=False)
                 st.download_button(
                     label="📊 Download Filtered CSV",
                     data=csv_data,
@@ -497,7 +507,7 @@ try:
                 )
             
             with dl2:
-                full_csv = display_df.to_csv(index=False)
+                full_csv = display_df[display_columns].to_csv(index=False)
                 st.download_button(
                     label="📈 Download Complete CSV",
                     data=full_csv,
@@ -508,7 +518,7 @@ try:
             
             with dl3:
                 # Top performers CSV (top 100 by % change)
-                top_performers = display_df.nlargest(100, '% Change')
+                top_performers = display_df.nlargest(100, '% Price Change')[display_columns]
                 top_csv = top_performers.to_csv(index=False)
                 st.download_button(
                     label="🏆 Download Top 100 Performers",
@@ -551,6 +561,6 @@ st.markdown("""
     <h4>📊 NSE Bhavcopy Viewer</h4>
     <p><strong>Data Source:</strong> National Stock Exchange (NSE) via nselib package</p>
     <p><strong>Note:</strong> Bhavcopy data is typically available after market hours (3:30 PM IST)</p>
-    <p><em>Made with ❤️ using Streamlit</em></p>
+    <p><em>Soli Deo Gloria</em></p>
 </div>
 """, unsafe_allow_html=True)
